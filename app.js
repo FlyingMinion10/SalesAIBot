@@ -7,6 +7,7 @@ const { createReadStream } = require('fs');
 const FormData = require('form-data');
 const morgan = require('morgan'); // Middelware para logs
 require('dotenv').config(); // Carga las variables de entorno
+const { sendToOpenAIAssistant } = require('./openai'); // Importa la función sendToOpenAIAssistant
 
 // Configura tu token de Telegram Bot y API de OpenAI
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -41,49 +42,68 @@ async function transcribeAudio(audioFilePath) {
   }
 }
 
+// Función para enviar texto a un asistente de OpenAI
+async function processRequest(userId, userMessage) { 
+    try {
+        const assistantResponse = sendToOpenAIAssistant(userId, userMessage);
+
+    } catch (error) {
+        console.error('Error al enviar mensaje al asistente de OpenAI:', error);
+        return 'Hubo un error al procesar tu solicitud.';
+    }
+}
+
 // Escucha los mensajes entrantes
 bot.on('message', async (msg) => {
-  const chatId = msg.chat.id; // Guarda el ID del chat
-  console.log(`ID del chat: ${chatId}`);
+    const chatId = msg.chat.id; // Guarda el ID del chat
+    console.log(`ID del chat: ${chatId}`);
 
-  if (msg.text) {
-    // Si es texto
-    const texto = msg.text;
-    console.log(`Mensaje de texto recibido: ${texto}`);
-    bot.sendMessage(chatId, '¡Mensaje de texto recibido!');
-  } else if (msg.voice) {
-    // Si es un mensaje de voz
-    try {
-      const fileId = msg.voice.file_id;
-      const fileLink = await bot.getFileLink(fileId);
+    // Si hay un mensaje valido
+    if (msg.text || msg.voice) {
+        // Si es texto
+        if (msg.text) {
+            const texto = msg.text;
+            console.log(`Mensaje de texto recibido: ${texto}`);
+            const openAIResponse = await processRequest(chatId, texto);
+            bot.sendMessage(chatId, openAIResponse);
+        
+        // Si es un mensaje de voz
+        } else if (msg.voice) {
+            try {
+                const fileId = msg.voice.file_id;
+                const fileLink = await bot.getFileLink(fileId);
 
-      // Descarga el archivo de audio
-      const audioPath = path.resolve(__dirname, 'audio.ogg');
-      const writer = fs.createWriteStream(audioPath);
-      const response = await axios({
-        url: fileLink,
-        method: 'GET',
-        responseType: 'stream',
-      });
-      response.data.pipe(writer);
+                // Descarga el archivo de audio
+                const audioPath = path.resolve(__dirname, 'audio.ogg');
+                const writer = fs.createWriteStream(audioPath);
+                const response = await axios({
+                    url: fileLink,
+                    method: 'GET',
+                    responseType: 'stream',
+                });
+                response.data.pipe(writer);
 
-      writer.on('finish', async () => {
-        console.log('Audio descargado, enviando a Whisper...');
-        const transcribedText = await transcribeAudio(audioPath);
-        if (transcribedText) {
-          bot.sendMessage(chatId, `Audio transcrito: ${transcribedText}`);
-        } else {
-          bot.sendMessage(chatId, 'No se pudo transcribir el audio.');
+                writer.on('finish', async () => {
+                    console.log('Audio descargado, enviando a Whisper...');
+                    const transcribedText = await transcribeAudio(audioPath);
+                    if (transcribedText) {
+                        const openAIResponse = await processRequest(chatId, transcribedText);
+                        bot.sendMessage(chatId, openAIResponse);
+                    } else {
+                        bot.sendMessage(chatId, 'No se pudo transcribir el audio.');
+                    }
+                    fs.unlinkSync(audioPath); // Elimina el archivo temporal
+                });
+            } catch (error) {
+                console.error('Error al manejar el mensaje de voz:', error);
+                bot.sendMessage(chatId, 'Ocurrió un error al procesar el audio.');
+            }
         }
-        fs.unlinkSync(audioPath); // Elimina el archivo temporal
-      });
-    } catch (error) {
-      console.error('Error al manejar el mensaje de voz:', error);
-      bot.sendMessage(chatId, 'Ocurrió un error al procesar el audio.');
+
+    // Si NO hay un mensaje valido
+    } else {
+        bot.sendMessage(chatId, 'Formato no soportado. Envía texto o un mensaje de voz.');
     }
-  } else {
-    bot.sendMessage(chatId, 'Formato no soportado. Envía texto o un mensaje de voz.');
-  }
 });
 
 // Webhook para recibir mensajes de WhatsApp
