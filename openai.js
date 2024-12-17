@@ -1,11 +1,20 @@
 // Importar dependencias
 const { OpenAI } = require("openai");
+const axios = require('axios');
+const FormData = require('form-data');
+const { createReadStream } = require('fs');
+const { getThread, registerThread } = require('./database.js'); 
 require("dotenv").config();
-const { getOrCreateThread } = require('./database'); // Importa la función sendToOpenAIAssistant
+
+// Importar variables de entorno
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID;
+
+
 
 // Configurar conexión con OpenAI
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: OPENAI_API_KEY,
 });
 
 // Conrfguración de modelos GPT
@@ -14,6 +23,11 @@ const models = {
     "verificador": "gpt-4o",
     "autoparser": "gpt-4o-mini",
 };
+
+// Funcion print
+function print(text) {
+    console.log(text);
+}
 
 // Función para enviar audio a Whisper de OpenAI
 async function transcribeAudio(audioFilePath) {
@@ -45,7 +59,14 @@ async function sendToOpenAIAssistant(userId, userMessage) {
         }
 
         // Obtener o crear un thread
-        const threadId = await getOrCreateThread(userId);
+        let threadId = await getThread(userId);
+        print(`Thread ID: ${threadId}`);
+        if (threadId === null) {
+            print("Creando un nuevo thread...");
+            const thread = await openai.beta.threads.create();
+            threadId = thread.id;
+            await registerThread(userId, threadId);
+        }
 
         // Crear un nuevo mensaje en el thread
         await openai.beta.threads.messages.create(threadId, {
@@ -55,7 +76,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 
         // Ejecutar el assistant
         const run = await openai.beta.threads.runs.create(threadId, {
-            assistant_id: process.env.OPENAI_ASSISTANT_ID,
+            assistant_id: OPENAI_ASSISTANT_ID,
         });
 
         // Polling para esperar la respuesta
@@ -76,69 +97,48 @@ async function sendToOpenAIAssistant(userId, userMessage) {
     }
 };
 
-// Esquema de salida esperado
-const outputSchema = {
-    response: {
-        parte_uno: "Texto correspondiente a la primera parte de la respuesta.",
-        parte_dos: "Texto correspondiente a la segunda parte de la respuesta.",
-        parte_tres: "Texto correspondiente a la tercera parte de la respuesta (opcional).",
-        imagen: ["la imagen"]
-    }
-};
-
-// Función para validar la salida contra el esquema
-function validateOutput(output) {
-    try {
-        if (
-            output.response &&
-            typeof output.response.parte_uno === "string" &&
-            typeof output.response.parte_dos === "string" &&
-            typeof output.response.parte_tres === "string" &&
-            Array.isArray(output.response.imagen)
-        ) {
-            return true;
-        }
-    } catch (e) {
-        return false;
-    }
-    return false;
-}
-
 // Dar formato a las respuestas del assistant
-async function darFormato(assistantResponse) {
-    const response = await openai.chat.completions.create({
-        model: models.verificador, // Modelo usado
-        messages: [
-            {
-                role: "system",
-                content: `Especificaciones para el formato de respuesta: Divide tu respuesta en tres partes solo si es necesario, si el contenido es corto utiliza únicamente "parte_uno" y deja "parte_dos" vacía. Dale una tonalidad animada a tu mensaje y un estilo de acento Mexicano. Devuelve la respuesta en formato JSON.`
-            },
-            {
-                role: "user",
-                content: assistantResponse
-            }
-        ],
-        response_format: { type: "json" }, // Asegura salida JSON
-    });
-    return JSON.parse(response.choices[0].message.content);
+async function darFormato(assistantResponse, 
+    systemInstructions = `Especificaciones para el formato de respuesta: Divide tu respuesta en partes (máximo 3) solo si es necesario, utiliza  "parte_uno" y "parte_dos" y "parte_tres" a tu consideración dependiendo de la longitud del mensaje recibido. Dale una tonalidad animada a tu mensaje y un estilo de acento Mexicano. Devuelve la respuesta en formato JSON para cada una de las partes existentes`
+) {
+    try {
+        const response = await openai.chat.completions.create({
+            model: models.verificador, // Modelo usado
+            messages: [
+                {
+                    role: "system",
+                    content: systemInstructions
+                },
+                {
+                    role: "user",
+                    content: assistantResponse
+                }
+            ],
+            response_format: { type: "json_object" }, // Asegura salida JSON
+        });
+        return JSON.parse(response.choices[0].message.content);
+    } catch (error) {
+        console.error("Error al parsear la respuesta del modelo:", error);
+        throw new Error("No se pudo parsear la respuesta del modelo.");
+    }
 }
 
 // Dar formato a las respuestas del assistant
 async function sendToverificador(assistantResponse) {
-    let output = await darFormato(assistantResponse);
+    try {
+        console.log("Respuesta inicial del modelo:", assistantResponse);
+        let formatedMsg = await darFormato(assistantResponse);
 
-    console.log("Respuesta inicial del modelo:", output);
+        console.log("Respuesta formateada:", formatedMsg);
 
-    if (!validateOutput(output)) {
-        console.log("Formato inválido. Corrigiendo con un auto-fixer...");
-        // Auto-fixing: Solicita al modelo corregir el formato
-        const fixingPrompt = `Corrige el siguiente JSON para que coincida con el esquema: ${JSON.stringify(outputSchema)}.\n\nJSON recibido: ${JSON.stringify(output)}`;
-        output = await darFormato(fixingPrompt);
+
+        return formatedMsg;
+    } catch (error) {
+        console.error("Error en sendToverificador:", error.message);
+        return null;
     }
-
-    console.log("Respuesta final validada:", output);
-    return output;
 }
+
 
 // Exportar la funcion
 module.exports = { sendToOpenAIAssistant, transcribeAudio, sendToverificador };

@@ -3,15 +3,12 @@ const TelegramBot = require('node-telegram-bot-api'); // Librería para el bot d
 const axios = require('axios'); // Cliente HTTP para hacer peticiones
 const fs = require('fs'); 
 const path = require('path');
-const { createReadStream } = require('fs');
-const FormData = require('form-data');
 const morgan = require('morgan'); // Middelware para logs
 require('dotenv').config(); // Carga las variables de entorno
-const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./openai'); // Importa la función sendToOpenAIAssistant
+const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./src/openai'); // Importa la función sendToOpenAIAssistant
 
 // Configura tu token de Telegram Bot y API de OpenAI
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
@@ -20,15 +17,21 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // const PORT = process.env.PORT || 3000;
 // app.use(bodyParser.json());
 
-app.use(morgan('combined'));
+// app.use(morgan('combined'));
 
 // Función para enviar texto a un asistente de OpenAI
+
+// Funcion print
+function print(text) {
+    console.log(text);
+}
+
 async function processRequest(userId, userMessage) { 
     try {
         const assistantResponse = await sendToOpenAIAssistant(userId, userMessage);
-        const verificadorResponse = await sendToverificador(assistantResponse);
+        const output = await sendToverificador(assistantResponse);
         
-
+        return output;
     } catch (error) {
         console.error('Error al enviar mensaje al asistente de OpenAI:', error);
         return 'Hubo un error al procesar tu solicitud.';
@@ -38,6 +41,7 @@ async function processRequest(userId, userMessage) {
 // Escucha los mensajes entrantes
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id; // Guarda el ID del chat
+
     console.log(`ID del chat: ${chatId}`);
 
     // Si hay un mensaje valido
@@ -46,8 +50,20 @@ bot.on('message', async (msg) => {
         if (msg.text) {
             const texto = msg.text;
             console.log(`Mensaje de texto recibido: ${texto}`);
-            const openAIResponse = await processRequest(chatId, texto);
-            bot.sendMessage(chatId, openAIResponse);
+            
+            // Después de obtener la respuesta de OpenAI
+            const openAIResponse = await processRequest(chatId, texto);            
+            // Iteramos sobre cada clave del objeto y enviamos el mensaje correspondiente
+            if (openAIResponse) {
+                for (const parte in openAIResponse) {
+                    if (openAIResponse.hasOwnProperty(parte)) {
+                        const mensaje = openAIResponse[parte];
+                        await bot.sendMessage(chatId, mensaje);
+                    }
+                }
+            } else {
+                bot.sendMessage(chatId, 'No se pudo obtener una respuesta válida.');
+            }
         
         // Si es un mensaje de voz
         } else if (msg.voice) {
@@ -69,8 +85,19 @@ bot.on('message', async (msg) => {
                     console.log('Audio descargado, enviando a Whisper...');
                     const transcribedText = await transcribeAudio(audioPath);
                     if (transcribedText) {
+                        // Después de obtener la respuesta de OpenAI
                         const openAIResponse = await processRequest(chatId, transcribedText);
-                        bot.sendMessage(chatId, openAIResponse);
+                        // Iteramos sobre cada clave del objeto y enviamos el mensaje correspondiente
+                        if (openAIResponse) {
+                            for (const parte in openAIResponse) {
+                                if (openAIResponse.hasOwnProperty(parte)) {
+                                    const mensaje = openAIResponse[parte];
+                                    await bot.sendMessage(chatId, mensaje);
+                                }
+                            }
+                        } else {
+                            bot.sendMessage(chatId, 'No se pudo obtener una respuesta válida.');
+                        }
                     } else {
                         bot.sendMessage(chatId, 'No se pudo transcribir el audio.');
                     }
