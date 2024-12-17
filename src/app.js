@@ -3,34 +3,20 @@ const TelegramBot = require('node-telegram-bot-api'); // Librería para el bot d
 const axios = require('axios'); // Cliente HTTP para hacer peticiones
 const fs = require('fs'); 
 const path = require('path');
-const morgan = require('morgan'); // Middelware para logs
+// const morgan = require('morgan'); // Middelware para logs
 require('dotenv').config(); // Carga las variables de entorno
-const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./src/openai'); // Importa la función sendToOpenAIAssistant
+const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./openai'); // Importa la función sendToOpenAIAssistant
 
 // Configura tu token de Telegram Bot y API de OpenAI
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 
-// Configuración para WhatsApp (Webhook)
-// const app = express();
-// const PORT = process.env.PORT || 3000;
-// app.use(bodyParser.json());
-
-// app.use(morgan('combined'));
-
-// Función para enviar texto a un asistente de OpenAI
-
-// Funcion print
-function print(text) {
-    console.log(text);
-}
-
+// Funcion principal para procesar los mensajes
 async function processRequest(userId, userMessage) { 
     try {
         const assistantResponse = await sendToOpenAIAssistant(userId, userMessage);
         const output = await sendToverificador(assistantResponse);
-        
         return output;
     } catch (error) {
         console.error('Error al enviar mensaje al asistente de OpenAI:', error);
@@ -41,7 +27,6 @@ async function processRequest(userId, userMessage) {
 // Escucha los mensajes entrantes
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id; // Guarda el ID del chat
-
     console.log(`ID del chat: ${chatId}`);
 
     // Si hay un mensaje valido

@@ -2,7 +2,9 @@
 const { OpenAI } = require("openai");
 const axios = require('axios');
 const FormData = require('form-data');
-const { createReadStream } = require('fs');
+const fs = require('fs');
+const { createReadStream } = fs;
+const path = require('path');
 const { getThread, registerThread } = require('./database.js'); 
 require("dotenv").config();
 
@@ -11,11 +13,9 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID;
 
 
-
-// Configurar conexión con OpenAI
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+// Importar texto de instrucciones
+const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
+const prompt = fs.readFileSync(pathPrompt, "utf8")
 
 // Conrfguración de modelos GPT
 const models = {
@@ -28,6 +28,11 @@ const models = {
 function print(text) {
     console.log(text);
 }
+
+// Configurar conexión con OpenAI
+const openai = new OpenAI({
+  apiKey: OPENAI_API_KEY,
+});
 
 // Función para enviar audio a Whisper de OpenAI
 async function transcribeAudio(audioFilePath) {
@@ -60,13 +65,14 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 
         // Obtener o crear un thread
         let threadId = await getThread(userId);
-        print(`Thread ID: ${threadId}`);
+
         if (threadId === null) {
             print("Creando un nuevo thread...");
             const thread = await openai.beta.threads.create();
             threadId = thread.id;
             await registerThread(userId, threadId);
         }
+        print(`Thread ID: ${threadId}`);
 
         // Crear un nuevo mensaje en el thread
         await openai.beta.threads.messages.create(threadId, {
@@ -97,10 +103,8 @@ async function sendToOpenAIAssistant(userId, userMessage) {
     }
 };
 
-// Dar formato a las respuestas del assistant
-async function darFormato(assistantResponse, 
-    systemInstructions = `Especificaciones para el formato de respuesta: Divide tu respuesta en partes (máximo 3) solo si es necesario, utiliza  "parte_uno" y "parte_dos" y "parte_tres" a tu consideración dependiendo de la longitud del mensaje recibido. Dale una tonalidad animada a tu mensaje y un estilo de acento Mexicano. Devuelve la respuesta en formato JSON para cada una de las partes existentes`
-) {
+// Dar formato a las verificaciones
+async function darFormato(assistantResponse, systemInstructions = `${prompt}` ) {
     try {
         const response = await openai.chat.completions.create({
             model: models.verificador, // Modelo usado
@@ -123,7 +127,7 @@ async function darFormato(assistantResponse,
     }
 }
 
-// Dar formato a las respuestas del assistant
+// Manager de verificacion a las respuestas del assistant
 async function sendToverificador(assistantResponse) {
     try {
         console.log("Respuesta inicial del modelo:", assistantResponse);

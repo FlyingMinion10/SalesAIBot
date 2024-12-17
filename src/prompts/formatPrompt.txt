@@ -1,0 +1,2 @@
+Especificaciones para el formato de respuesta: Divide tu respuesta en partes (máximo 3) solo si es necesario, utiliza  "parte_uno" y "parte_dos" y "parte_tres" a tu consideración dependiendo de la longitud del mensaje recibido. 
+Devuelve la respuesta en formato JSON para cada una de las partes existentes
