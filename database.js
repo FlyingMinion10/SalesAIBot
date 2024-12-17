@@ -1,14 +1,6 @@
 // Importar dependencias
-const { OpenAI } = require("openai");
-const express = require("express");
-const bodyParser = require("body-parser");
 const { Pool } = require("pg");
 require("dotenv").config();
-
-// Configurar conexión con OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Configurar conexión con PostgreSQL
 const pool = new Pool({
@@ -45,45 +37,5 @@ const getOrCreateThread = async (userId) => {
   }
 };
 
-// Endpoint para manejar mensajes del usuario
-async function sendToOpenAIAssistant(userId, userMessage) {
-    try {
-
-        if (!userId || !userMessage) {
-            return res.status(400).json({ error: "user_id y message son requeridos." });
-        }
-
-        // Obtener o crear un thread
-        const threadId = await getOrCreateThread(userId);
-
-        // Crear un nuevo mensaje en el thread
-        await openai.beta.threads.messages.create(threadId, {
-            role: "user",
-            content: userMessage,
-        });
-
-        // Ejecutar el assistant
-        const run = await openai.beta.threads.runs.create(threadId, {
-            assistant_id: process.env.OPENAI_ASSISTANT_ID,
-        });
-
-        // Polling para esperar la respuesta
-        let runStatus;
-        do {
-            runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-        } while (runStatus.status !== "completed");
-
-        // Obtener la respuesta del assistant
-        const messages = await openai.beta.threads.messages.list(threadId);
-        const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
-
-        return responseContent
-    } catch (error) {
-        console.error("Error:", error);
-        return "Hubo un error al procesar tu solicitud.";
-    }
-};
-
 // Exportar la funcion
-module.exports = { sendToOpenAIAssistant };
+module.exports = { getOrCreateThread };
