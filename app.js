@@ -7,7 +7,7 @@ const { createReadStream } = require('fs');
 const FormData = require('form-data');
 const morgan = require('morgan'); // Middelware para logs
 require('dotenv').config(); // Carga las variables de entorno
-const { sendToOpenAIAssistant } = require('./openai'); // Importa la función sendToOpenAIAssistant
+const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./openai'); // Importa la función sendToOpenAIAssistant
 
 // Configura tu token de Telegram Bot y API de OpenAI
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -22,30 +22,12 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 app.use(morgan('combined'));
 
-// Función para enviar audio a Whisper de OpenAI
-async function transcribeAudio(audioFilePath) {
-  const formData = new FormData();
-  formData.append('file', createReadStream(audioFilePath));
-  formData.append('model', 'whisper-1');
-
-  try {
-    const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        Authorization: `Bearer ${OPENAI_API_KEY}`
-      }
-    });
-    return response.data.text;
-  } catch (error) {
-    console.error('Error al transcribir el audio:', error);
-    return null;
-  }
-}
-
 // Función para enviar texto a un asistente de OpenAI
 async function processRequest(userId, userMessage) { 
     try {
-        const assistantResponse = sendToOpenAIAssistant(userId, userMessage);
+        const assistantResponse = await sendToOpenAIAssistant(userId, userMessage);
+        const verificadorResponse = await sendToverificador(assistantResponse);
+        
 
     } catch (error) {
         console.error('Error al enviar mensaje al asistente de OpenAI:', error);
