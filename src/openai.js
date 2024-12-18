@@ -104,7 +104,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 };
 
 // Dar formato a las verificaciones
-async function darFormato(assistantResponse, systemInstructions = `${prompt}` ) {
+async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
     try {
         const response = await openai.chat.completions.create({
             model: models.verificador, // Modelo usado
@@ -131,7 +131,7 @@ async function darFormato(assistantResponse, systemInstructions = `${prompt}` ) 
 async function sendToverificador(assistantResponse) {
     try {
         console.log("Respuesta inicial del modelo:", assistantResponse);
-        let formatedMsg = await darFormato(assistantResponse);
+        let formatedMsg = await formatear(assistantResponse);
 
         console.log("Respuesta formateada:", formatedMsg);
 

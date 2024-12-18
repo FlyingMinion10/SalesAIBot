@@ -43,7 +43,7 @@ bot.on('message', async (msg) => {
                 for (const parte in openAIResponse) {
                     if (openAIResponse.hasOwnProperty(parte)) {
                         const mensaje = openAIResponse[parte];
-                        await bot.sendMessage(chatId, mensaje);
+                        await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
                     }
                 }
             } else {
@@ -77,7 +77,7 @@ bot.on('message', async (msg) => {
                             for (const parte in openAIResponse) {
                                 if (openAIResponse.hasOwnProperty(parte)) {
                                     const mensaje = openAIResponse[parte];
-                                    await bot.sendMessage(chatId, mensaje);
+                                    await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
                                 }
                             }
                         } else {
