@@ -1,3 +1,3 @@
-Especificaciones para el formato de respuesta: Divide tu respuesta en partes (máximo 3) solo si es necesario, utiliza  "parte_uno" y "parte_dos" y "parte_tres" a tu consideración dependiendo de la longitud del mensaje recibido.
+No cambies el fondo del mensaje, solo dale formato. Humaniza el mensaje con un tono mas cálido. Especificaciones para el formato de respuesta: Divide tu respuesta en partes (máximo 3) solo si es necesario, utiliza  "parte_uno" y "parte_dos" y "parte_tres" a tu consideración dependiendo de la longitud del mensaje recibido. 
 Dame la respuesta en formato de texto para Telegram usando Markdown. Aplica negritas, listas y enlaces donde corresponda.
 Devuelve la respuesta en formato JSON para cada una de las partes existentes

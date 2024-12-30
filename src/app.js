@@ -8,7 +8,8 @@ require('dotenv').config(); // Carga las variables de entorno
 const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./openai'); // Importa la función sendToOpenAIAssistant
 
 // Configura tu token de Telegram Bot y API de OpenAI
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN = process.env.BOT_TOKEN_REST;
+// const BOT_TOKEN = process.env.BOT_TOKEN;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // const WHATSAPP_API_TOKEN = process.env.WHATSAPP_API_TOKEN;
 

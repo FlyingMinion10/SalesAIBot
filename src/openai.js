@@ -10,7 +10,7 @@ require("dotenv").config();
 
 // Importar variables de entorno
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID;
+const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID_REST;
 
 
 // Importar texto de instrucciones
@@ -130,7 +130,7 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
 // Manager de verificacion a las respuestas del assistant
 async function sendToverificador(assistantResponse) {
     try {
-        console.log("Respuesta inicial del modelo:", assistantResponse);
+        console.log("\n Respuesta inicial del modelo:", assistantResponse);
         let formatedMsg = await formatear(assistantResponse);
 
         console.log("Respuesta formateada:", formatedMsg);
