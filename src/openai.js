@@ -80,41 +80,62 @@ const availableFunctions = {
     }
 };
 
-// Función para manejar las acciones requeridas
-const handleRequiresAction = async (run, threadId) => {
-    if (
-        run.required_action &&
-        run.required_action.submit_tool_outputs &&
-        run.required_action.submit_tool_outputs.tool_calls
-    ) {
-        const toolOutputs = await Promise.all(
-            run.required_action.submit_tool_outputs.tool_calls.map(async (tool) => {
-                const functionName = tool.function.name;
-                const functionArgs = JSON.parse(tool.function.arguments);
-                
-                if (functionName in availableFunctions) {
-                    const result = await availableFunctions[functionName](functionArgs);
-                    return {
-                        tool_call_id: tool.id,
-                        output: JSON.stringify(result)
-                    };
-                }
-            })
-        );
+async function agendar_reserva(args) {
+    console.log("Function call agendar_reserva()");
+    const { date, time } = args;
+    const ISOdate = asignarFechaHora(date, time);
+    return { status: "success" };
+}
 
-        if (toolOutputs.length > 0) {
-            run = await client.beta.threads.runs.submitToolOutputs(
-                threadId,
-                run.id,
-                { tool_outputs: toolOutputs }
-            );
-            console.log("Tool outputs submitted successfully.");
-        }
+async function send_email(args) {
+    console.log("Function call send_email()");
+    const { email_address, reservation_details } = args;
+    return { status: "success" };
+}
+
+
+// Función para manejar las acciones requeridas
+async function handleRequiresAction(run, threadId) {
+    const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
+    const toolOutputs = [];
+
+    for (const toolCall of toolCalls) {
+        const { id, function: { name, arguments: args } } = toolCall;
         
-        // return handleRunStatus(run, threadId);
-        return
+        // Parsear los argumentos JSON
+        const functionArgs = JSON.parse(args);
+        
+        // Ejecutar la función correspondiente
+        let result;
+        try {
+            switch (name) {
+                case 'agendar_reserva':
+                    result = await agendar_reserva(functionArgs.query);
+                    break;
+                case 'send_email':
+                    result = await send_email(functionArgs.productId);
+                    break;
+                // Agregar más casos según las funciones disponibles
+                default:
+                    result = `Función ${name} no implementada`;
+            }
+        } catch (error) {
+            result = `Error ejecutando ${name}: ${error.message}`;
+        }
+
+        toolOutputs.push({
+            tool_call_id: id,
+            output: JSON.stringify(result)
+        });
     }
-};
+
+    // Enviar los resultados al asistente
+    await openai.beta.threads.runs.submitToolOutputs(
+        threadId,
+        run.id,
+        { tool_outputs: toolOutputs }
+    );
+}
 
 // Función para manejar el estado del run
 const handleRunStatus = async (run, threadId) => {
@@ -166,7 +187,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
                 print("REQUIRES ACTION")
                 print(runStatus)
                 print(runStatus.status)
-                await handleRequiresAction(run, threadId);}
+                await handleRequiresAction(runStatus, threadId);}
         } while (runStatus.status !== "completed");
 
         // Obtener la respuesta del assistant
