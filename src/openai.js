@@ -2,20 +2,21 @@
 const { OpenAI } = require("openai");
 const axios = require('axios');
 const FormData = require('form-data');
-const fs = require('fs');
-const { createReadStream } = fs;
+const { createReadStream } = require('fs');
 const path = require('path');
-const { getThread, registerThread } = require('./database.js'); 
 require("dotenv").config();
 
-// Importar variables de entorno
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID_REST;
-
+// Importaciones de funciones locales
+const { getThread, registerThread } = require('./database.js'); 
+const { asignarFechaHora } = require('./datetime.js'); 
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
 const prompt = fs.readFileSync(pathPrompt, "utf8")
+
+// Importar variables de entorno
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID_REST;
 
 // Conrfguración de modelos GPT
 const models = {
@@ -34,8 +35,56 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
+// Definimos las funciones disponibles para el modelo
+const functions = [
+    {
+        name: "schedule",
+        description: "Programa un evento en una fecha y hora específicas",
+        parameters: {
+            type: "object",
+            properties: {
+                date: {
+                    type: "string",
+                    description: "Fecha del evento en formato YYYY-MM-DD",
+                },
+                time: {
+                    type: "string",
+                    description: "Hora del evento en formato HH:MM",
+                },
+            },
+            required: ["date", "time"],
+        },
+    },
+    {
+        name: "sendMail",
+        description: "Envía un correo electrónico con los detalles del evento",
+        parameters: {
+            type: "object",
+            properties: {
+                email: {
+                    type: "string",
+                    description: "Dirección de correo electrónico del destinatario",
+                },
+                date: {
+                    type: "string",
+                    description: "Fecha del evento en formato YYYY-MM-DD",
+                },
+                time: {
+                    type: "string",
+                    description: "Hora del evento en formato HH:MM",
+                },
+            },
+            required: ["email", "date", "time"],
+        },
+    },
+];
+
+// --------------------------
+//   FUNCIONES INTELIGENTES
+// --------------------------
+
 // Función para enviar audio a Whisper de OpenAI
-async function transcribeAudio(audioFilePath) {
+async function sendToWhisper(audioFilePath) {
     const formData = new FormData();
     formData.append('file', createReadStream(audioFilePath));
     formData.append('model', models.audio);
@@ -103,6 +152,15 @@ async function sendToOpenAIAssistant(userId, userMessage) {
     }
 };
 
+function schedule(date, time) {
+    var ISOdate = asignarFechaHora(date, time);
+    console.log(`Evento programado para la fecha y hora: ${ISOdate}`);
+};
+
+// --------------------------
+//   FUNCIONES OPERATIVAS
+// --------------------------
+
 // Dar formato a las verificaciones
 async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
     try {
@@ -145,4 +203,4 @@ async function sendToverificador(assistantResponse) {
 
 
 // Exportar la funcion
-module.exports = { sendToOpenAIAssistant, transcribeAudio, sendToverificador };
+module.exports = { sendToOpenAIAssistant, sendToWhisper, sendToverificador };

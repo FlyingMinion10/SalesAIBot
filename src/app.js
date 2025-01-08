@@ -4,7 +4,7 @@ const axios = require('axios'); // Cliente HTTP para hacer peticiones
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config(); // Carga las variables de entorno
-const { sendToOpenAIAssistant, transcribeAudio, sendToverificador } = require('./openai'); // Funciones personalizadas
+const { sendToOpenAIAssistant, sendToWhisper, sendToverificador } = require('./openai'); // Funciones personalizadas
 const express = require('express');
 const bodyParser = require('body-parser');
 const twilio = require('twilio');
@@ -78,7 +78,7 @@ bot.on('message', async (msg) => {
 
         writer.on('finish', async () => {
           console.log('(Telegram) Audio descargado, enviando a Whisper...');
-          const transcribedText = await transcribeAudio(audioPath);
+          const transcribedText = await sendToWhisper(audioPath);
           if (transcribedText) {
             const openAIResponse = await processRequest(chatId, transcribedText);
             if (openAIResponse) {
