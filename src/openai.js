@@ -2,7 +2,8 @@
 const { OpenAI } = require("openai");
 const axios = require('axios');
 const FormData = require('form-data');
-const { createReadStream } = require('fs');
+const fs = require('fs');
+const { createReadStream } = fs;
 const path = require('path');
 require("dotenv").config();
 
@@ -35,49 +36,10 @@ const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
+const client = openai;
+
 // Definimos las funciones disponibles para el modelo
-const functions = [
-    {
-        name: "schedule",
-        description: "Programa un evento en una fecha y hora específicas",
-        parameters: {
-            type: "object",
-            properties: {
-                date: {
-                    type: "string",
-                    description: "Fecha del evento en formato YYYY-MM-DD",
-                },
-                time: {
-                    type: "string",
-                    description: "Hora del evento en formato HH:MM",
-                },
-            },
-            required: ["date", "time"],
-        },
-    },
-    {
-        name: "sendMail",
-        description: "Envía un correo electrónico con los detalles del evento",
-        parameters: {
-            type: "object",
-            properties: {
-                email: {
-                    type: "string",
-                    description: "Dirección de correo electrónico del destinatario",
-                },
-                date: {
-                    type: "string",
-                    description: "Fecha del evento en formato YYYY-MM-DD",
-                },
-                time: {
-                    type: "string",
-                    description: "Hora del evento en formato HH:MM",
-                },
-            },
-            required: ["email", "date", "time"],
-        },
-    },
-];
+
 
 // --------------------------
 //   FUNCIONES INTELIGENTES
@@ -103,42 +65,108 @@ async function sendToWhisper(audioFilePath) {
     }
 }
 
-// Funcion para procesar las respuestas con el assistant
+// Mantener las funciones disponibles existentes
+const availableFunctions = {
+    agendar_reserva: async (args) => {
+        console.log("Function call agendar_reserva()");
+        const { date, time } = args;
+        const ISOdate = asignarFechaHora(date, time);
+        return { status: "success"};
+    },
+    send_email: async (args) => {
+        console.log("Function call send_email()");
+        const { email_address, reservation_details } = args;
+        return { status: "success" };
+    }
+};
+
+// Función para manejar las acciones requeridas
+const handleRequiresAction = async (run, threadId) => {
+    if (
+        run.required_action &&
+        run.required_action.submit_tool_outputs &&
+        run.required_action.submit_tool_outputs.tool_calls
+    ) {
+        const toolOutputs = await Promise.all(
+            run.required_action.submit_tool_outputs.tool_calls.map(async (tool) => {
+                const functionName = tool.function.name;
+                const functionArgs = JSON.parse(tool.function.arguments);
+                
+                if (functionName in availableFunctions) {
+                    const result = await availableFunctions[functionName](functionArgs);
+                    return {
+                        tool_call_id: tool.id,
+                        output: JSON.stringify(result)
+                    };
+                }
+            })
+        );
+
+        if (toolOutputs.length > 0) {
+            run = await client.beta.threads.runs.submitToolOutputs(
+                threadId,
+                run.id,
+                { tool_outputs: toolOutputs }
+            );
+            console.log("Tool outputs submitted successfully.");
+        }
+        
+        // return handleRunStatus(run, threadId);
+        return
+    }
+};
+
+// Función para manejar el estado del run
+const handleRunStatus = async (run, threadId) => {
+    if (run.status === "completed") {
+        const messages = await client.beta.threads.messages.list(threadId);
+        return messages.data;
+    } else if (run.status === "requires_action") {
+        return await handleRequiresAction(run, threadId);
+    } else {
+        console.error("Run did not complete:", run);
+        return null;
+    }
+};
+
+// Función principal modificada
 async function sendToOpenAIAssistant(userId, userMessage) {
     try {
 
+        // Crear o recuperar thread
         if (!userId || !userMessage) {
             console.error("Error:", "user_id y message son requeridos");
             return "Hubo un error al procesar tu solicitud.";
         }
 
-        // Obtener o crear un thread
         let threadId = await getThread(userId);
-
         if (threadId === null) {
-            print("Creando un nuevo thread...");
             const thread = await openai.beta.threads.create();
             threadId = thread.id;
             await registerThread(userId, threadId);
         }
-        print(`Thread ID: ${threadId}`);
 
-        // Crear un nuevo mensaje en el thread
-        await openai.beta.threads.messages.create(threadId, {
+        // Agregar mensaje al thread
+        await client.beta.threads.messages.create(threadId, {
             role: "user",
-            content: userMessage,
+            content: userMessage
         });
 
-        // Ejecutar el assistant
-        const run = await openai.beta.threads.runs.create(threadId, {
-            assistant_id: OPENAI_ASSISTANT_ID,
+        // Crear y ejecutar el run
+        let run = await client.beta.threads.runs.create(threadId, {
+            assistant_id: OPENAI_ASSISTANT_ID
         });
 
-        // Polling para esperar la respuesta
+        // Manejar el estado del run
         let runStatus;
         do {
             runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
             await new Promise((resolve) => setTimeout(resolve, 2000));
+            if (runStatus.status === "requires_action") {
+                print("REQUIRES ACTION")
+                print(runStatus)
+                print(runStatus.status)
+                await handleRequiresAction(run, threadId);}
         } while (runStatus.status !== "completed");
 
         // Obtener la respuesta del assistant
@@ -147,15 +175,10 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 
         return responseContent
     } catch (error) {
-        console.error("Error:", error);
-        return "Hubo un error al procesar tu solicitud.";
+        console.error("Error en sendToOpenAIAssistant:", error);
+        return null;
     }
-};
-
-function schedule(date, time) {
-    var ISOdate = asignarFechaHora(date, time);
-    console.log(`Evento programado para la fecha y hora: ${ISOdate}`);
-};
+}
 
 // --------------------------
 //   FUNCIONES OPERATIVAS
@@ -188,10 +211,10 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
 // Manager de verificacion a las respuestas del assistant
 async function sendToverificador(assistantResponse) {
     try {
-        console.log("\n Respuesta inicial del modelo:", assistantResponse);
+        console.log("    Respuesta inicial del modelo:", assistantResponse);
         let formatedMsg = await formatear(assistantResponse);
 
-        console.log("Respuesta formateada:", formatedMsg);
+        // console.log("Respuesta formateada:", formatedMsg);
 
 
         return formatedMsg;

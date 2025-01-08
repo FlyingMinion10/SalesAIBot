@@ -9,8 +9,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const twilio = require('twilio');
 
-// Configura tu token de Telegram Bot y API de OpenAI
-const BOT_TOKEN = process.env.BOT_TOKEN_SALES;
+// Configura tu token de TELEGRAM Bot y API de OpenAI
+const BOT_TOKEN = process.env.BOT_TOKEN_REST;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Credenciales de Twilio
@@ -38,7 +38,7 @@ async function processRequest(userId, userMessage) {
 // ----------------------------------
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  console.log(`(Telegram) ID del chat: ${chatId}`);
+  console.log(`\n(Telegram) ID del chat: ${chatId}`);
 
   // Verifica si es texto o un mensaje de voz
   if (msg.text || msg.voice) {
