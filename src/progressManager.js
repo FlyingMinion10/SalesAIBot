@@ -4,6 +4,8 @@ class ProgressManager {
         this.currentProgress = 0;
         this.maxProgress = 100;
         this.isFirstUpdate = true;
+        this.disabled = true;
+        // this.disabled = true;
     }
 
     drawProgressBar(progress, message) {
@@ -15,6 +17,8 @@ class ProgressManager {
     }
 
     updateProgress(newProgress, message = '') {
+        if (this.disabled) { return; }
+
         // Si es la primera actualización, agregar una línea nueva
         if (this.isFirstUpdate) {
             console.log(''); // Línea en blanco para la barra
