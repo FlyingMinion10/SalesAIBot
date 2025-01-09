@@ -10,6 +10,7 @@ require("dotenv").config();
 // Importaciones de funciones locales
 const { getThread, registerThread } = require('./database.js'); 
 const { asignarFechaHora } = require('./datetime.js'); 
+const e = require("express");
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
@@ -45,51 +46,17 @@ const client = openai;
 //   FUNCIONES INTELIGENTES
 // --------------------------
 
-// Función para enviar audio a Whisper de OpenAI
-async function sendToWhisper(audioFilePath) {
-    const formData = new FormData();
-    formData.append('file', createReadStream(audioFilePath));
-    formData.append('model', models.audio);
-
-    try {
-        const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
-            headers: {
-                ...formData.getHeaders(),
-                Authorization: `Bearer ${OPENAI_API_KEY}`
-            }
-        });
-        return response.data.text;
-    } catch (error) {
-        console.error('Error al transcribir el audio:', error);
-        return null;
-    }
-}
-
-// Mantener las funciones disponibles existentes
-const availableFunctions = {
-    agendar_reserva: async (args) => {
-        console.log("Function call agendar_reserva()");
-        const { date, time } = args;
-        const ISOdate = asignarFechaHora(date, time);
-        return { status: "success"};
-    },
-    send_email: async (args) => {
-        console.log("Function call send_email()");
-        const { email_address, reservation_details } = args;
-        return { status: "success" };
-    }
-};
-
-async function agendar_reserva(args) {
-    console.log("Function call agendar_reserva()");
-    const { date, time } = args;
-    const ISOdate = asignarFechaHora(date, time);
+async function agendar_reserva(date, time) {
+    print("Function call agendar_reserva()");
+    print("date:", date, "time:", time);
+    // const ISOdate = asignarFechaHora(date, time);
+    // print("ISOdate:", ISOdate);
     return { status: "success" };
 }
 
-async function send_email(args) {
-    console.log("Function call send_email()");
-    const { email_address, reservation_details } = args;
+async function send_email(email_address, reservation_details) {
+    print("Function call send_email()");
+    print("email_address:", email_address, "reservation_details:", reservation_details);
     return { status: "success" };
 }
 
@@ -100,55 +67,66 @@ async function handleRequiresAction(run, threadId) {
     const toolOutputs = [];
 
     for (const toolCall of toolCalls) {
-        const { id, function: { name, arguments: args } } = toolCall;
-        
-        // Parsear los argumentos JSON
-        const functionArgs = JSON.parse(args);
-        
-        // Ejecutar la función correspondiente
-        let result;
         try {
+
+            const { id, function: { name, arguments: args } } = toolCall;
+            
+            // Log de los argumentos antes de parsear
+            // console.log('Argumentos raw:', args);
+            
+            // Verificar si args es ya un objeto
+            const functionArgs = typeof args === 'object' ? 
+                args : 
+                JSON.parse(args);
+                
+            console.log('Argumentos parseados:', functionArgs);
+
+            // Ejecutar la función correspondiente
+            let result;
             switch (name) {
                 case 'agendar_reserva':
-                    result = await agendar_reserva(functionArgs.query);
+                    const date = functionArgs.date;
+                    const time = functionArgs.time;
+                    console.log('Llamando agendar_reserva con:', date, time );
+                    
+                    result = await agendar_reserva(date, time);
                     break;
-                case 'send_email':
-                    result = await send_email(functionArgs.productId);
-                    break;
-                // Agregar más casos según las funciones disponibles
-                default:
-                    result = `Función ${name} no implementada`;
-            }
-        } catch (error) {
-            result = `Error ejecutando ${name}: ${error.message}`;
-        }
 
-        toolOutputs.push({
-            tool_call_id: id,
-            output: JSON.stringify(result)
-        });
+                case 'send_email':
+                    const email = functionArgs.email_address;
+                    const details = functionArgs.reservation_details;
+                    console.log('Llamando send_email con:', email, details);
+
+                    result = await send_email(email, details);
+                    break;
+
+                default:
+                    console.warn(`Función no reconocida: ${name}`);
+            }
+
+            // Importante: Guardar el resultado
+            toolOutputs.push({
+                tool_call_id: id,
+                output: JSON.stringify(result || {success: false})
+            });
+        } catch (error) {
+            console.error('Error procesando toolCall:', {
+                error: error.message,
+                toolCall
+            });
+            // Continuar con el siguiente toolCall
+            continue;
+        }
     }
 
     // Enviar los resultados al asistente
+    print("Enviar los resultados al asistente")
     await openai.beta.threads.runs.submitToolOutputs(
         threadId,
         run.id,
         { tool_outputs: toolOutputs }
     );
 }
-
-// Función para manejar el estado del run
-const handleRunStatus = async (run, threadId) => {
-    if (run.status === "completed") {
-        const messages = await client.beta.threads.messages.list(threadId);
-        return messages.data;
-    } else if (run.status === "requires_action") {
-        return await handleRequiresAction(run, threadId);
-    } else {
-        console.error("Run did not complete:", run);
-        return null;
-    }
-};
 
 // Función principal modificada
 async function sendToOpenAIAssistant(userId, userMessage) {
@@ -185,8 +163,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             if (runStatus.status === "requires_action") {
                 print("REQUIRES ACTION")
-                print(runStatus)
-                print(runStatus.status)
+                print(runStatus.required_action)
                 await handleRequiresAction(runStatus, threadId);}
         } while (runStatus.status !== "completed");
 
@@ -204,6 +181,26 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 // --------------------------
 //   FUNCIONES OPERATIVAS
 // --------------------------
+
+// Función para enviar audio a Whisper de OpenAI
+async function sendToWhisper(audioFilePath) {
+    const formData = new FormData();
+    formData.append('file', createReadStream(audioFilePath));
+    formData.append('model', models.audio);
+
+    try {
+        const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
+            headers: {
+                ...formData.getHeaders(),
+                Authorization: `Bearer ${OPENAI_API_KEY}`
+            }
+        });
+        return response.data.text;
+    } catch (error) {
+        console.error('Error al transcribir el audio:', error);
+        return null;
+    }
+}
 
 // Dar formato a las verificaciones
 async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {

@@ -38,14 +38,14 @@ async function processRequest(userId, userMessage) {
 // ----------------------------------
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  console.log(`\n(Telegram) ID del chat: ${chatId}`);
+  // console.log(`\n(Telegram) ID del chat: ${chatId}`);
 
   // Verifica si es texto o un mensaje de voz
   if (msg.text || msg.voice) {
     // Si es texto
     if (msg.text) {
       const texto = msg.text;
-      console.log(`(Telegram) Mensaje de texto recibido: ${texto}`);
+      console.log(`\n(Telegram) - ${chatId}  Mensaje de texto recibido: ${texto}`);
 
       const openAIResponse = await processRequest(chatId, texto);
 
