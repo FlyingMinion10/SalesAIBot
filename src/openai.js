@@ -10,8 +10,7 @@ require("dotenv").config();
 
 // Importaciones de funciones locales
 const { getThread, registerThread } = require('./database.js'); 
-const { asignarFechaHora } = require('./datetime.js'); 
-const { updateProgress } = require('./app');
+const progressManager = require('./progressManager');
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
@@ -28,8 +27,8 @@ const models = {
     "autoparser": "gpt-4o-mini",
 };
 
-// Funcion callback
-let isDebuggingActive = false;
+// Funcion CALLBACK
+const isDebuggingActive = false;
 // function callback(text, text2 = "", text3 = "") {
 function callback(text, mod = isDebuggingActive) {
     mod ? console.log(text) : null;
@@ -89,16 +88,13 @@ async function handleRequiresAction(run, threadId) {
     const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
     const toolOutputs = [];
 
-    updateProgress(30, "Procesando acciones requeridas");
+    progressManager.updateProgress(40, "Procesando acciones requeridas");
     for (const toolCall of toolCalls) {
         try {
 
             const { id, function: { name, arguments: args } } = toolCall;
-            
-            // Log de los argumentos antes de parsear
             // console.log('Argumentos raw:', args);
             
-            // Verificar si args es ya un objeto
             const functionArgs = typeof args === 'object' ? 
                 args : 
                 JSON.parse(args);
@@ -107,7 +103,6 @@ async function handleRequiresAction(run, threadId) {
 
             // Ejecutar la función correspondiente
             let result;
-            updateProgress(40, "Ejecutando acciones requeridas");
             switch (name) {
                 case 'agendar_reserva':
                     const date = functionArgs.date;
@@ -126,10 +121,10 @@ async function handleRequiresAction(run, threadId) {
                 default:
                     console.warn(`Función no reconocida: ${name}`);
             }
-            console.log(result)
+            callback(result)
 
             // Importante: Guardar el resultado
-            updateProgress(60, "Retroalimentando al asistente");
+            progressManager.updateProgress(60, "Retroalimentando al asistente");
             toolOutputs.push({
                 tool_call_id: id,
                 output: JSON.stringify(result || {success: false})
@@ -163,7 +158,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
             return "Hubo un error al procesar tu solicitud.";
         }
 
-        updateProgress(15, "Retrieving thread");
+        progressManager.updateProgress(10, "Retrieving thread");
         let threadId = await getThread(userId);
         if (threadId === null) {
             const thread = await openai.beta.threads.create();
@@ -181,7 +176,7 @@ async function sendToOpenAIAssistant(userId, userMessage) {
         });
 
         // Crear y ejecutar el run
-        updateProgress(20, "Running assistant");
+        progressManager.updateProgress(20, "Running assistant");
         let run = await client.beta.threads.runs.create(threadId, {
             assistant_id: OPENAI_ASSISTANT_ID
         });
@@ -198,11 +193,11 @@ async function sendToOpenAIAssistant(userId, userMessage) {
                 await handleRequiresAction(runStatus, threadId);}
         } while (runStatus.status !== "completed");
 
-        updateProgress(70, "Getting assistant's response");
+        progressManager.updateProgress(70, "Getting assistant response");
         // Obtener la respuesta del assistant
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
-
+        
         return responseContent
     } catch (error) {
         console.error("Error en sendToOpenAIAssistant:", error);
@@ -261,12 +256,13 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
 // Manager de verificacion a las respuestas del assistant
 async function sendToverificador(assistantResponse) {
     try {
-        console.log("    Respuesta inicial del modelo:", assistantResponse);
-        updateProgress(90, "Parseando respuesta");
+
+        progressManager.updateProgress(85, "Parseando respuesta");
         let formatedMsg = await formatear(assistantResponse);
-
+        progressManager.updateProgress(100)
+        console.log("\n\nRespuesta inicial del modelo:", assistantResponse);
+        
         // console.log("Respuesta formateada:", formatedMsg);
-
 
         return formatedMsg;
     } catch (error) {

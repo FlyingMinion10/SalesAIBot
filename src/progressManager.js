@@ -2,7 +2,7 @@
 class ProgressManager {
     constructor() {
         this.currentProgress = 0;
-        this.totalSteps = 100;
+        this.maxProgress = 100;
         this.isFirstUpdate = true;
     }
 
@@ -14,14 +14,14 @@ class ProgressManager {
         return `\rProgress: [${progressBar}] ${progress}% ${message}`;
     }
 
-    updateProgress(steps, message = '') {
+    updateProgress(newProgress, message = '') {
         // Si es la primera actualización, agregar una línea nueva
         if (this.isFirstUpdate) {
             console.log(''); // Línea en blanco para la barra
             this.isFirstUpdate = false;
         }
 
-        this.currentProgress = Math.min(this.currentProgress + steps, this.totalSteps);
+        this.currentProgress = Math.min(newProgress, this.maxProgress);
         const output = this.drawProgressBar(this.currentProgress, message);
         
         // Usar write para actualizar la misma línea

@@ -8,6 +8,7 @@ const { sendToOpenAIAssistant, sendToWhisper, sendToverificador } = require('./o
 const express = require('express');
 const bodyParser = require('body-parser');
 const twilio = require('twilio');
+const progressManager = require('./progressManager'); // Importar el ProgressManager
 
 // Credenciales de Telegram
 const BOT_TOKEN = process.env.BOT_TOKEN_REST;
@@ -23,39 +24,11 @@ const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 // Función principal de lógica
 // --------------------------
 
-// Configuración de la barra de progreso
-let currentProgress = 0;
-const totalSteps = 100; // Puedes ajustar esto según tus necesidades
-
-// Mantener la función para dibujar la barra de progreso
-const drawProgressBar = (progress) => {
-    const barWidth = 30;
-    const filledWidth = Math.floor(progress / 100 * barWidth);
-    const emptyWidth = barWidth - filledWidth;
-    const progressBar = '█'.repeat(filledWidth) + '▒'.repeat(emptyWidth);
-    return `[${progressBar}] ${progress}%`;
-}
-
-// Nueva función para actualizar el progreso
-const updateProgress = (steps, step) => {
-    currentProgress = Math.min(currentProgress + steps, totalSteps);
-    process.stdout.clearLine();
-    process.stdout.cursorTo(0);
-    process.stdout.write(`Progress: ${drawProgressBar(currentProgress)} (${step})`);
-    
-    if (currentProgress >= totalSteps) {
-        console.log("\n");
-        console.log("done");
-    }
-}
-
 async function processRequest(userId, userMessage) {
   try {
     const assistantResponse = await sendToOpenAIAssistant(userId, userMessage);
-
-    updateProgress(80, "Verificando respuesta")
+    
     const output = await sendToverificador(assistantResponse);
-    updateProgress(100, "Enviando respuesta")
     return output;
   } catch (error) {
     console.error('Error al enviar mensaje al asistente de OpenAI:', error);
@@ -72,11 +45,11 @@ bot.on('message', async (msg) => {
 
   // Verifica si es texto o un mensaje de voz
   if (msg.text || msg.voice) {
-    updateProgress(10, "Mensaje recibido")
     // Si es texto
     if (msg.text) {
       const texto = msg.text;
       console.log(`\n(Telegram) - ${chatId}  Mensaje de texto recibido: ${texto}`);
+      
 
       const openAIResponse = await processRequest(chatId, texto);
 
@@ -190,5 +163,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor Express escuchando en el puerto ${PORT}`);
 });
-
-module.exports = { updateProgress };
