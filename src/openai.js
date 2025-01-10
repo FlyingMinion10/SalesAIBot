@@ -11,6 +11,7 @@ require("dotenv").config();
 // Importaciones de funciones locales
 const { getThread, registerThread } = require('./database.js'); 
 const progressManager = require('./progressManager');
+const { emailManager, managerTest} = require('./sendMail');
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
@@ -27,58 +28,63 @@ const models = {
     "autoparser": "gpt-4o-mini",
 };
 
-// Funcion CALLBACK
-const isDebuggingActive = false;
-// function callback(text, text2 = "", text3 = "") {
-function callback(text, mod = isDebuggingActive) {
-    mod ? console.log(text) : null;
-}
-
 // Configurar conexión con OpenAI
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 const client = openai;
 
-// Definimos las funciones disponibles para el modelo
+// --------------------------
+// Funciones de utilidad
+// --------------------------
+
+const isDebuggingActive = true;
+function callback(text, mod = isDebuggingActive) {
+    mod ? console.log(text) : null;
+}
+
+function blueLog(text, text2='') {
+    console.log(`\x1b[34m${text}\x1b[0m`, text2);
+}
+
+function red(text) {
+    return (`\x1b[31m${text}\x1b[0m`);
+}
+
+function flat(text) {
+    const flatResponseV3 = text.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return flatResponseV3;
+}
 
 
 // --------------------------
 //   FUNCIONES INTELIGENTES
 // --------------------------
 
+// Código de escape ANSI para color rojo
+
 async function agendar_reserva(date, time) {
-    callback(`agendar_reserva recibió: ${date}, ${time}`);
-    const ISOdate = date + 'T' + time;
+    if (!date || !time) { throw new Error('Parámetros incompletos'); }
     
-    if (!ISOdate) {
-        throw new Error('Fecha inválida');
-    }
+    blueLog(`\nRESERVA AGENDADA ${date} ${time}`);
     
     const result = {
         success: true,
-        reservation: {
-            date: ISOdate,
-            original: {date, time}
-        }
     };
-
     return result;
 }
 
 async function send_email(email, details) {
-    callback(`agendar_reserva recibió: ${email}, ${details}`);
-    
-    if (!email || !details) {
-        throw new Error('Parámetros incompletos');
-    }
+    if (!email || !details) { throw new Error('Parámetros incompletos'); }
+
+    let manager_results =  await emailManager(email, 'Reserva confirmada', details);
+    blueLog(`\nEMAIL ENVIADO ${ email } ${ manager_results }`);
     
     const result = {
         success: true,
         sent_to: email,
         reservation: details
     };
-    
     return result;
 }
 
@@ -99,32 +105,28 @@ async function handleRequiresAction(run, threadId) {
                 args : 
                 JSON.parse(args);
                 
-            callback(`Argumentos parseados: ${functionArgs}`);
 
             // Ejecutar la función correspondiente
             let result;
             switch (name) {
                 case 'agendar_reserva':
-                    const date = functionArgs.date;
-                    const time = functionArgs.time;
                     
+                    const { date, time } = functionArgs;
                     result = await agendar_reserva(date, time);
                     break;
 
                 case 'send_email':
-                    const email = functionArgs.email_address;
-                    const details = functionArgs.reservation_details;
-
-                    result = await send_email(email, details);
+                    
+                    const { email_address, reservation_details } = functionArgs;
+                    result = await send_email(email_address, reservation_details);
                     break;
 
                 default:
-                    console.warn(`Función no reconocida: ${name}`);
+                    console.warn(`Función no reconocida: ${name} \n`);
             }
-            callback(result)
+            console.log(`Tool Callback (149) ${name}: ${result.success}`); // MFM \n
 
             // Importante: Guardar el resultado
-            progressManager.updateProgress(60, "Retroalimentando al asistente");
             toolOutputs.push({
                 tool_call_id: id,
                 output: JSON.stringify(result || {success: false})
@@ -140,7 +142,6 @@ async function handleRequiresAction(run, threadId) {
     }
 
     // Enviar los resultados al asistente
-    callback("Enviar los resultados al asistente")
     await openai.beta.threads.runs.submitToolOutputs(
         threadId,
         run.id,
@@ -169,7 +170,6 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 
         // Agregar mensaje al thread
         const now = DateTime.now().toISO();
-        callback("Now:" + now);
         await client.beta.threads.messages.create(threadId, {
             role: "user",
             content: userMessage + now
@@ -188,9 +188,9 @@ async function sendToOpenAIAssistant(userId, userMessage) {
             runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
             await new Promise((resolve) => setTimeout(resolve, 2000));
             if (runStatus.status === "requires_action") {
-                callback("REQUIRES ACTION")
-                callback(runStatus.required_action);
+                callback(runStatus.required_action, false);
                 await handleRequiresAction(runStatus, threadId);}
+
         } while (runStatus.status !== "completed");
 
         progressManager.updateProgress(70, "Getting assistant response");
@@ -259,8 +259,9 @@ async function sendToverificador(assistantResponse) {
 
         progressManager.updateProgress(85, "Parseando respuesta");
         let formatedMsg = await formatear(assistantResponse);
+        
         progressManager.updateProgress(100)
-        console.log("\n\nRespuesta inicial del modelo:", assistantResponse);
+        blueLog(`\nRespuesta inicial del modelo:`, flat(assistantResponse));
         
         // console.log("Respuesta formateada:", formatedMsg);
 

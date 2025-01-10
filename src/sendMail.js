@@ -144,17 +144,18 @@ async function sendEmail({ to, subject, body }) {
 async function emailManager(to, subject, details) {
 
     const { guest_name: name, reservation_date: date, num_of_guests: guests, table_type: table } = details;
-    console.log('Email manager parameters:', email, name, date, guests, table );
+    // console.log('Email manager parameters:', to, name, date, guests, table );
 
     let body = `
-        Hola, ${name}!
+    Hola, ${name}!
 
-        Tu reserva ha sido confirmada. Aquí están los detalles:
-        - Personas: ${guests}
-        - Fecha: ${date}
-        - Mesa: ${table}
+    Tu reserva ha sido confirmada. Aquí están los detalles:
+    
+    - Personas: ${guests}
+    - Fecha: ${date}
+    - Mesa: ${table}
 
-        ¡Gracias por elegirnos!
+    ¡Gracias por elegirnos!
     `;
 
     let result = await sendEmail({
@@ -164,7 +165,6 @@ async function emailManager(to, subject, details) {
         body: body
     });
 
-    console.log('Email manager result:', result);
     return result;
 }
 

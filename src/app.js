@@ -21,6 +21,14 @@ const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // Formato: '
 const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 // --------------------------
+// Funciones de utilidad
+// --------------------------
+
+function green(text) {
+  return (`\x1b[32m${text}\x1b[0m`);
+}
+
+// --------------------------
 // Función principal de lógica
 // --------------------------
 
@@ -48,7 +56,8 @@ bot.on('message', async (msg) => {
     // Si es texto
     if (msg.text) {
       const texto = msg.text;
-      console.log(`\n(Telegram) - ${chatId}  Mensaje de texto recibido: ${texto}`);
+      console.log('\n','- - '.repeat(30));
+      console.log(`(Telegram) - ${chatId} Mensaje: ${green(texto)}`);
       
 
       const openAIResponse = await processRequest(chatId, texto);
@@ -110,8 +119,6 @@ bot.on('message', async (msg) => {
   }
 });
 
-console.log('Bot de Telegram iniciado. Escuchando mensajes...');
-
 // ----------------------------------
 // Lógica de TWILIO (WhatsApp)
 // ----------------------------------
@@ -161,5 +168,8 @@ app.post('/whatsapp', async (req, res) => {
 // Inicia el servidor en el puerto que desees, p. ej. 3000
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor Express escuchando en el puerto ${PORT}`);
+
+  // eliminar las ultimas 4 lineas de la consola
+  process.stdout.write('\x1bc');
+  console.log('Bot de Telegram iniciado. Escuchando mensajes...');
 });
