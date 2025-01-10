@@ -1,48 +1,3 @@
-// const { google } = require('googleapis');
-// require("dotenv").config();
-
-// // Replace these values with your own
-// const CLIENT_ID = process.env.CLIENT_ID;
-// const CLIENT_SECRET = process.env.CLIENT_SECRET;
-// const REDIRECT_URI = process.env.REDIRECT_URI;
-
-// // Create the OAuth2 client
-// const oauth2Client = new google.auth.OAuth2(
-//   CLIENT_ID,
-//   CLIENT_SECRET,
-//   REDIRECT_URI
-// );
-
-// // Set the required Gmail scopes.
-// // For sending emails, 'https://mail.google.com/' is sufficient.
-// const SCOPES = ['https://mail.google.com/'];
-
-// // Generate the url that we need to visit
-// const authUrl = oauth2Client.generateAuthUrl({
-//   access_type: 'offline',
-//   scope: SCOPES,
-//   prompt: 'consent', // ensures we always get a refresh token
-// });
-
-// console.log('Authorize this app by visiting this url:', authUrl);
-
-// // After visiting the URL and granting permission, Google will redirect
-// // to your REDIRECT_URI, e.g. http://localhost:3000/oauth2callback?code=<CODE>
-// // Paste that <CODE> value into the function below:
-
-// async function getTokens(code) {
-//   const { tokens } = await oauth2Client.getToken(code);
-//   console.log('Tokens:', tokens);
-//   // The refresh token is tokens.refresh_token
-//   // The access token is tokens.access_token
-//   // Save them somewhere secure (e.g. environment variables)
-// }
-
-// getTokens("4/0AanRRrur12ErfgpBZP0MJKtKU9MGs98MyA76OZK-TQqEs1mUosu53lRTBiA5XIA68GdpZA&scope=https://mail.google.com/");
-
-// // Uncomment and paste the authorization code (from the URL redirect) below, then run:
-// // getTokens('PASTE_AUTHORIZATION_CODE_HERE');
-
 const { google } = require('googleapis');
 require('dotenv').config();
 
@@ -165,7 +120,7 @@ async function emailManager(to, subject, details) {
         body: body
     });
 
-    return result;
+    return result == true ? true : false;
 }
 
 async function managerTest() {

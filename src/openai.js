@@ -12,6 +12,7 @@ require("dotenv").config();
 const { getThread, registerThread } = require('./database.js'); 
 const progressManager = require('./progressManager');
 const { emailManager, managerTest} = require('./sendMail');
+const { calendarManager } = require('./calendarAPI');
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
@@ -47,6 +48,10 @@ function blueLog(text, text2='') {
     console.log(`\x1b[34m${text}\x1b[0m`, text2);
 }
 
+function redLog(text, text2='') {
+    console.log(`\x1b[31m${text}\x1b[0m`, text2);
+}
+
 function red(text) {
     return (`\x1b[31m${text}\x1b[0m`);
 }
@@ -63,10 +68,11 @@ function flat(text) {
 
 // Código de escape ANSI para color rojo
 
-async function agendar_reserva(date, time) {
+async function agendarReserva(date, time) {
     if (!date || !time) { throw new Error('Parámetros incompletos'); }
     
-    blueLog(`\nRESERVA AGENDADA ${date} ${time}`);
+    let calendar_results = await calendarManager(date, time);
+    calendar_results ? blueLog(`\nRESERVA AGENDADA ${date} ${time}`) : redLog(`\nError al agendar la reserva ${date} ${time}`);
     
     const result = {
         success: true,
@@ -74,11 +80,11 @@ async function agendar_reserva(date, time) {
     return result;
 }
 
-async function send_email(email, details) {
+async function sendEmail(email, details) {
     if (!email || !details) { throw new Error('Parámetros incompletos'); }
 
     let manager_results =  await emailManager(email, 'Reserva confirmada', details);
-    blueLog(`\nEMAIL ENVIADO ${ email } ${ manager_results }`);
+    manager_results ? blueLog(`\nEMAIL ENVIADO ${ email }`) : redLog(`Error al enviar el email ${ email }`);
     
     const result = {
         success: true,
@@ -112,13 +118,13 @@ async function handleRequiresAction(run, threadId) {
                 case 'agendar_reserva':
                     
                     const { date, time } = functionArgs;
-                    result = await agendar_reserva(date, time);
+                    result = await agendarReserva(date, time);
                     break;
 
                 case 'send_email':
                     
                     const { email_address, reservation_details } = functionArgs;
-                    result = await send_email(email_address, reservation_details);
+                    result = await sendEmail(email_address, reservation_details);
                     break;
 
                 default:
@@ -167,12 +173,16 @@ async function sendToOpenAIAssistant(userId, userMessage) {
             await registerThread(userId, threadId);
         }
         
-
         // Agregar mensaje al thread
-        const now = DateTime.now().toISO();
+        const now = DateTime.now();
+        const dayOfWeek = now.toFormat('cccc'); // Nombre completo del día de la semana
+        const formattedDate = now.toFormat('yyyy-MM-dd\' \'HH:mm'); // Formato de fecha y hora
+
+        const timestamp = ` (${dayOfWeek} ${formattedDate})`;
+
         await client.beta.threads.messages.create(threadId, {
             role: "user",
-            content: userMessage + now
+            content: userMessage + timestamp
         });
 
         // Crear y ejecutar el run
