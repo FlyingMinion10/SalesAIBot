@@ -99,19 +99,20 @@ async function sendEmail({ to, subject, body }) {
 
 async function emailManager(to, subject, details) {
 
-    const { guest_name: name, reservation_date: date, num_of_guests: guests, table_type: table } = details;
+    const { client_name: name, appointment_date: date, business_description: bussiness, specific_task: task } = details;
     // console.log('Email manager parameters:', to, name, date, guests, table );
 
     let body = `
     Hola, ${name}!
 
-    Tu reserva ha sido confirmada. Aquí están los detalles:
+    Recibimos tu solicitud para agendar una reunión con uno de nuestros expertos quien se asegurará de que cumplamos con tus expectativas 📈.
     
-    - Personas: ${guests}
-    - Fecha: ${date}
-    - Mesa: ${table}
+    Te confirmamos la información que nos facilitaste:
+    - Descripción general de tu negocio: ${bussiness}
+    - Tarea en la que se especializara nuestro agente: ${task}
+    - Agendado el día: ${date}
 
-    ¡Gracias por elegirnos!
+    Listo para llevar tu negocio al siguiente nivel? 🚀
     `;
 
     let result = await sendEmail({

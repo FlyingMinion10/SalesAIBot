@@ -16,7 +16,7 @@ const calendar = google.calendar({
     auth: oauth2Client,
 });
 
-async function createCalendarEvent(body, date, hour) {
+async function createCalendarEvent(body, date, hour, name) {
   try {
     // 1. Construimos la fecha/hora de inicio con offset -06:00
     //    Ejemplo: date = '2025-01-10', hour = '10'  => '2025-01-10T10:00:00-06:00'
@@ -27,7 +27,7 @@ async function createCalendarEvent(body, date, hour) {
 
     // 3. Creamos el objeto del evento usando las fechas convertidas a ISO
     const event = {
-      summary: 'Reserva de restaurante',
+      summary: `Reunión con ${name}`,
       description: body,
       start: {
         dateTime: startDate.toISOString(),
@@ -54,13 +54,15 @@ async function createCalendarEvent(body, date, hour) {
 }
 
 
-async function calendarManager(date, time) {
+async function calendarManager(date, time, name) {
     const body = `
-    ¡Tu reserva ha sido agendada!
+    ¡Tu reunión ha sido agendada!
     - Reserva agendada en el calendario de prueba.
+
+    [Espacio para detalles adicionales en un futuro]
     `;
 
-    return await createCalendarEvent( body, date, time) == true ? true : false;
+    return await createCalendarEvent( body, date, time, name) == true ? true : false;
 }
 
 module.exports = {
