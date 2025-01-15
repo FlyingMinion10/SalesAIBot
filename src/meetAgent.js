@@ -22,11 +22,11 @@ const openai = new OpenAI({
 const client = openai;
 
 
-async function agendarReserva(date, time) {
+async function agendarReserva(date, time, name) {
     if (!date || !time) { throw new Error('Parámetros incompletos'); }
     
-    let calendar_results = await calendarManager(date, time);
-    calendar_results ? l.blue(`\nRESERVA AGENDADA ${date} ${time}`) : l.red(`\nError al agendar la reserva ${date} ${time}`);
+    let calendar_results = await calendarManager(date, time, name);
+    calendar_results ? l.blue(`\nRESERVA AGENDADA ${date} ${time} ${name}`) : l.red(`\nError al agendar la reserva ${date} ${time}`);
     
     const result = {
         success: true,
@@ -70,14 +70,14 @@ async function handleRequiresAction(run, threadId) {
             switch (name) {
                 case 'agendar_reserva':
                     
-                    const { date, time } = functionArgs;
-                    result = await agendarReserva(date, time);
+                    const { date, time, name } = functionArgs;
+                    result = await agendarReserva(date, time, name);
                     break;
 
                 case 'send_email':
                     
-                    const { email_address, reservation_details } = functionArgs;
-                    result = await sendEmail(email_address, reservation_details);
+                    const { email_address, meeting_details } = functionArgs;
+                    result = await sendEmail(email_address, meeting_details);
                     break;
 
                 default:

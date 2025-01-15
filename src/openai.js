@@ -10,7 +10,7 @@ require("dotenv").config();
 // Importaciones de funciones locales
 const { getThread, registerThread } = require('./database.js'); 
 const { sendToMeetAgent } = require('./meetAgent');
-const { sendToPriceAgent } = require('./piceAgent');
+const { sendToPriceAgent } = require('./priceAgent');
 const { sendToInfoAgent } = require('./infoAgent');
 const { l, f, flat } = require('./tools/utils');
 
@@ -49,7 +49,7 @@ function callback(text, mod = isDebuggingActive) {
 // --------------------------
 
 // Función para manejar las acciones requeridas
-async function handleRequiresAction(run, threadId, userMessage) {
+async function handleAgentChooser(run, threadId) {
     const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
     const toolOutputs = [];
 
@@ -57,40 +57,23 @@ async function handleRequiresAction(run, threadId, userMessage) {
         try {
 
             const { id, function: { name, arguments: args } } = toolCall;
-            // console.log('Argumentos raw:', args);
-            
             const functionArgs = typeof args === 'object' ? 
                 args : 
                 JSON.parse(args);
-            
             const { agent } = functionArgs;
-                
-
-            // Ejecutar la función correspondiente
-            let result;
-            switch (agent) {
-                case 'reuniones':
-                    result = await sendToMeetAgent(threadId, userMessage);
-                    break;
-
-                case 'cotizaciones':
-                    result = await sendToPriceAgent(threadId, userMessage);
-                    break;
-
-                case 'informacion':
-                    result = await sendToInfoAgent(threadId, userMessage);
-                    break;
-
-                default:
-                    console.warn(`Función no reconocida: ${name} \n`);
-            }
-            console.log(`Tool Callback (149) ${name}: ${result.success}`); // MFM \n
-
+            
+            // Switch case eliminado test
+            
             // Importante: Guardar el resultado
             toolOutputs.push({
                 tool_call_id: id,
-                output: JSON.stringify(result || {success: false})
+                output: JSON.stringify({success: true})
             });
+            
+            // Devolver el agente seleccionado
+            console.log('Agente seleeccionado: ', agent);
+            return agent
+
         } catch (error) {
             console.error('Error procesando toolCall:', {
                 error: error.message,
@@ -108,6 +91,29 @@ async function handleRequiresAction(run, threadId, userMessage) {
         { tool_outputs: toolOutputs }
     );
     return result.responseContent
+}
+
+async function subAgentManager(selectedAgent, threadId, userMessage) {
+    
+    switch (selectedAgent) {
+        case 'reuniones':
+            result = await sendToMeetAgent(threadId, userMessage);
+            break;
+
+        case 'cotizaciones':
+            result = await sendToPriceAgent(threadId, userMessage);
+            break;
+
+        case 'informacion':
+            result = await sendToInfoAgent(threadId, userMessage);
+            break;
+
+        default:
+            console.warn(`Función no reconocida: ${selectedAgent} \n`);
+    }
+    console.log(`Tool Callback (114) ${selectedAgent}:`, result.success ? 'Success' : 'Failture' ); // MFM 
+    return result.responseContent
+    
 }
 
 // Función principal modificada
@@ -140,20 +146,25 @@ async function sendToCeoAgent(userId, userMessage) {
         // Manejar el estado del run
         
         let runStatus;
+        let subAgentResponse;
         do {
             runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
             await new Promise((resolve) => setTimeout(resolve, 2000));
             if (runStatus.status === "requires_action") {
-                callback(runStatus.required_action, false);
-                let subAgentResponse = await handleRequiresAction(runStatus, threadId);}
-
+                callback(runStatus.required_action, true);
+                // choosedAgent = await handleAgentChooser(runStatus, threadId);
+            }
         } while (runStatus.status !== "completed");
 
         // Obtener la respuesta del assistant
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
+        const parsedResponse = JSON.parse(responseContent);
+        const choosedAgent = parsedResponse.agent;
         
-        return subAgentResponse
+        subAgentResponse = await subAgentManager(choosedAgent, threadId, userMessage);
+
+        return subAgentResponse || responseContent;
     } catch (error) {
         console.error("Error en sendToCeoAgent:", error);
         return null;
