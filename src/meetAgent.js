@@ -144,7 +144,11 @@ async function sendToMeetAgent(threadId, userMessage) {
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
         
-        return responseContent
+        const result = {
+            success: true,
+            responseContent: responseContent,
+        };
+        return result
     } catch (error) {
         console.error("Error en sendToCeoAgent:", error);
         return null;

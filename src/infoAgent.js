@@ -20,7 +20,70 @@ const openai = new OpenAI({
 const client = openai;
 
 
+// async function fucntionName(arg1, arg2) {
+//     if (!arg1 || !arg2) { throw new Error('Parámetros incompletos'); }
+    
+//     // let fucntion_results = await fucntionManager(arg1, arg2);
+//     let fucntion_results = true;
+//     fucntion_results ? l.blue(`\FUNCION EXITOSA ${arg1} ${arg2}`) : l.red(`\nError al ejecutar funcion ${arg1} ${arg2}`);
+    
+//     const result = {
+//         success: fucntion_results,
+//     };
+//     return result;
+// }
 
+// // Función para manejar las acciones requeridas
+// async function handleRequiresAction(run, threadId) {
+//     const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
+//     const toolOutputs = [];
+
+//     for (const toolCall of toolCalls) {
+//         try {
+
+//             const { id, function: { name, arguments: args } } = toolCall;
+//             // console.log('Argumentos raw:', args);
+            
+//             const functionArgs = typeof args === 'object' ? 
+//                 args : 
+//                 JSON.parse(args);
+                
+
+//             // Ejecutar la función correspondiente
+//             let result;
+//             switch (name) {
+//                 case 'function_name':
+//                     const { arg1, arg2 } = functionArgs;
+//                     result = await fucntionName(arg1, arg2);
+//                     break;
+
+//                 default:
+//                     console.warn(`Función no reconocida: ${name} \n`);
+//             }
+//             console.log(`Tool Callback (149) ${name}: ${result.success}`); // MFM \n
+
+//             // Importante: Guardar el resultado
+//             toolOutputs.push({
+//                 tool_call_id: id,
+//                 output: JSON.stringify(result || {success: false})
+//             });
+//         } catch (error) {
+//             console.error('Error procesando toolCall:', {
+//                 error: error.message,
+//                 toolCall
+//             });
+//             // Continuar con el siguiente toolCall
+//             continue;
+//         }
+//     }
+
+//     // Enviar los resultados al asistente
+//     await openai.beta.threads.runs.submitToolOutputs(
+//         threadId,
+//         run.id,
+//         { tool_outputs: toolOutputs }
+//     );
+// }
 
 // Función principal modificada
 async function sendToInfoAgent(threadId, userMessage) {
@@ -50,7 +113,11 @@ async function sendToInfoAgent(threadId, userMessage) {
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
         
-        return responseContent
+        const result = {
+            success: true,
+            responseContent: responseContent,
+        };
+        return result
     } catch (error) {
         console.error("Error en sendToCeoAgent:", error);
         return null;

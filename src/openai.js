@@ -107,6 +107,7 @@ async function handleRequiresAction(run, threadId, userMessage) {
         run.id,
         { tool_outputs: toolOutputs }
     );
+    return result.responseContent
 }
 
 // Función principal modificada
@@ -144,7 +145,7 @@ async function sendToCeoAgent(userId, userMessage) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             if (runStatus.status === "requires_action") {
                 callback(runStatus.required_action, false);
-                await handleRequiresAction(runStatus, threadId);}
+                let subAgentResponse = await handleRequiresAction(runStatus, threadId);}
 
         } while (runStatus.status !== "completed");
 
@@ -152,7 +153,7 @@ async function sendToCeoAgent(userId, userMessage) {
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
         
-        return responseContent
+        return subAgentResponse
     } catch (error) {
         console.error("Error en sendToCeoAgent:", error);
         return null;
