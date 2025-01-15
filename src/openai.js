@@ -5,14 +5,14 @@ const FormData = require('form-data');
 const fs = require('fs');
 const { createReadStream } = fs;
 const path = require('path');
-const { DateTime } = require("luxon");
 require("dotenv").config();
 
 // Importaciones de funciones locales
 const { getThread, registerThread } = require('./database.js'); 
-const progressManager = require('./progressManager');
-const { emailManager, managerTest} = require('./sendMail');
-const { calendarManager } = require('./calendarAPI');
+const { sendToMeetAgent } = require('./meetAgent');
+const { sendToPriceAgent } = require('./piceAgent');
+const { sendToInfoAgent } = require('./infoAgent');
+const { l, f, flat } = require('./tools/utils');
 
 // Importar texto de instrucciones
 const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
@@ -20,12 +20,12 @@ const prompt = fs.readFileSync(pathPrompt, "utf8")
 
 // Importar variables de entorno
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID_REST;
+const OPENAI_ASSISTANT_ID = process.env.OPENAI_ASSISTANT_ID_CEO;
 
 // Conrfguración de modelos GPT
 const models = {
     "audio": "whisper-1",
-    "verificador": "gpt-4o",
+    "verificador": "gpt-4o-mini",
     "autoparser": "gpt-4o-mini",
 };
 
@@ -44,63 +44,15 @@ function callback(text, mod = isDebuggingActive) {
     mod ? console.log(text) : null;
 }
 
-function blueLog(text, text2='') {
-    console.log(`\x1b[34m${text}\x1b[0m`, text2);
-}
-
-function redLog(text, text2='') {
-    console.log(`\x1b[31m${text}\x1b[0m`, text2);
-}
-
-function red(text) {
-    return (`\x1b[31m${text}\x1b[0m`);
-}
-
-function flat(text) {
-    const flatResponseV3 = text.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
-    return flatResponseV3;
-}
-
-
 // --------------------------
 //   FUNCIONES INTELIGENTES
 // --------------------------
 
-// Código de escape ANSI para color rojo
-
-async function agendarReserva(date, time) {
-    if (!date || !time) { throw new Error('Parámetros incompletos'); }
-    
-    let calendar_results = await calendarManager(date, time);
-    calendar_results ? blueLog(`\nRESERVA AGENDADA ${date} ${time}`) : redLog(`\nError al agendar la reserva ${date} ${time}`);
-    
-    const result = {
-        success: true,
-    };
-    return result;
-}
-
-async function sendEmail(email, details) {
-    if (!email || !details) { throw new Error('Parámetros incompletos'); }
-
-    let manager_results =  await emailManager(email, 'Reserva confirmada', details);
-    manager_results ? blueLog(`\nEMAIL ENVIADO ${ email }`) : redLog(`Error al enviar el email ${ email }`);
-    
-    const result = {
-        success: true,
-        sent_to: email,
-        reservation: details
-    };
-    return result;
-}
-
-
 // Función para manejar las acciones requeridas
-async function handleRequiresAction(run, threadId) {
+async function handleRequiresAction(run, threadId, userMessage) {
     const toolCalls = run.required_action.submit_tool_outputs.tool_calls;
     const toolOutputs = [];
 
-    progressManager.updateProgress(40, "Procesando acciones requeridas");
     for (const toolCall of toolCalls) {
         try {
 
@@ -110,21 +62,23 @@ async function handleRequiresAction(run, threadId) {
             const functionArgs = typeof args === 'object' ? 
                 args : 
                 JSON.parse(args);
+            
+            const { agent } = functionArgs;
                 
 
             // Ejecutar la función correspondiente
             let result;
-            switch (name) {
-                case 'agendar_reserva':
-                    
-                    const { date, time } = functionArgs;
-                    result = await agendarReserva(date, time);
+            switch (agent) {
+                case 'reuniones':
+                    result = await sendToMeetAgent(threadId, userMessage);
                     break;
 
-                case 'send_email':
-                    
-                    const { email_address, reservation_details } = functionArgs;
-                    result = await sendEmail(email_address, reservation_details);
+                case 'cotizaciones':
+                    result = await sendToPriceAgent(threadId, userMessage);
+                    break;
+
+                case 'informacion':
+                    result = await sendToInfoAgent(threadId, userMessage);
                     break;
 
                 default:
@@ -156,7 +110,7 @@ async function handleRequiresAction(run, threadId) {
 }
 
 // Función principal modificada
-async function sendToOpenAIAssistant(userId, userMessage) {
+async function sendToCeoAgent(userId, userMessage) {
     try {
 
         // Crear o recuperar thread
@@ -165,28 +119,19 @@ async function sendToOpenAIAssistant(userId, userMessage) {
             return "Hubo un error al procesar tu solicitud.";
         }
 
-        progressManager.updateProgress(10, "Retrieving thread");
         let threadId = await getThread(userId);
         if (threadId === null) {
             const thread = await openai.beta.threads.create();
             threadId = thread.id;
             await registerThread(userId, threadId);
         }
-        
-        // Agregar mensaje al thread
-        const now = DateTime.now();
-        const dayOfWeek = now.toFormat('cccc'); // Nombre completo del día de la semana
-        const formattedDate = now.toFormat('yyyy-MM-dd\' \'HH:mm'); // Formato de fecha y hora
-
-        const timestamp = ` (${dayOfWeek} ${formattedDate})`;
 
         await client.beta.threads.messages.create(threadId, {
             role: "user",
-            content: userMessage + timestamp
+            content: userMessage
         });
 
         // Crear y ejecutar el run
-        progressManager.updateProgress(20, "Running assistant");
         let run = await client.beta.threads.runs.create(threadId, {
             assistant_id: OPENAI_ASSISTANT_ID
         });
@@ -203,14 +148,13 @@ async function sendToOpenAIAssistant(userId, userMessage) {
 
         } while (runStatus.status !== "completed");
 
-        progressManager.updateProgress(70, "Getting assistant response");
         // Obtener la respuesta del assistant
         const messages = await openai.beta.threads.messages.list(threadId);
         const responseContent = messages.data[0]?.content[0]?.text.value || "No hay respuesta disponible.";
         
         return responseContent
     } catch (error) {
-        console.error("Error en sendToOpenAIAssistant:", error);
+        console.error("Error en sendToCeoAgent:", error);
         return null;
     }
 }
@@ -267,11 +211,9 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
 async function sendToverificador(assistantResponse) {
     try {
 
-        progressManager.updateProgress(85, "Parseando respuesta");
         let formatedMsg = await formatear(assistantResponse);
         
-        progressManager.updateProgress(100)
-        blueLog(`\nRespuesta inicial del modelo:`, flat(assistantResponse));
+        l.blue(`\nRespuesta inicial del modelo:`, flat(assistantResponse));
         
         // console.log("Respuesta formateada:", formatedMsg);
 
@@ -284,4 +226,4 @@ async function sendToverificador(assistantResponse) {
 
 
 // Exportar la funcion
-module.exports = { sendToOpenAIAssistant, sendToWhisper, sendToverificador };
+module.exports = { sendToCeoAgent, sendToWhisper, sendToverificador };
