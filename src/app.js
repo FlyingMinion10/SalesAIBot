@@ -3,15 +3,18 @@ const TelegramBot = require('node-telegram-bot-api'); // Librería para el bot d
 const axios = require('axios'); // Cliente HTTP para hacer peticiones
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config(); // Carga las variables de entorno
-const { sendToOpenAIAssistant, sendToWhisper, sendToverificador } = require('./openai'); // Funciones personalizadas
 const express = require('express');
 const bodyParser = require('body-parser');
 const twilio = require('twilio');
+
+// Importaciones locales
+require('dotenv').config(); // Carga las variables de entorno
+const { sendToCeoAgent, sendToWhisper, sendToverificador } = require('./openai'); // Funciones personalizadas
 const progressManager = require('./progressManager'); // Importar el ProgressManager
+const { l, f, flat } = require('./tools/utils');
 
 // Credenciales de Telegram
-const BOT_TOKEN = process.env.BOT_TOKEN_REST;
+const BOT_TOKEN = process.env.BOT_TOKEN_NEXORA;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Credenciales de Twilio
@@ -21,20 +24,12 @@ const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // Formato: '
 const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 // --------------------------
-// Funciones de utilidad
-// --------------------------
-
-function green(text) {
-  return (`\x1b[32m${text}\x1b[0m`);
-}
-
-// --------------------------
 // Función principal de lógica
 // --------------------------
 
 async function processRequest(userId, userMessage) {
   try {
-    const assistantResponse = await sendToOpenAIAssistant(userId, userMessage);
+    const assistantResponse = await sendToCeoAgent(userId, userMessage);
     
     const output = await sendToverificador(assistantResponse);
     return output;
@@ -57,7 +52,7 @@ bot.on('message', async (msg) => {
     if (msg.text) {
       const texto = msg.text;
       console.log('\n','- - '.repeat(30));
-      console.log(`(Telegram) - ${chatId} Mensaje: ${green(texto)}`);
+      console.log(`(Telegram) - ${chatId} Mensaje: ${f.green(texto)}`);
       
 
       const openAIResponse = await processRequest(chatId, texto);
@@ -166,10 +161,13 @@ app.post('/whatsapp', async (req, res) => {
 });
 
 // Inicia el servidor en el puerto que desees, p. ej. 3000
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
 
   // eliminar las ultimas 4 lineas de la consola
   process.stdout.write('\x1bc');
   console.log('Bot de Telegram iniciado. Escuchando mensajes...');
 });
+
+// --------------------------
+module.exports = {f, l};
