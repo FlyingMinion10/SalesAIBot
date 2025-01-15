@@ -6,8 +6,9 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
 const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
+const MY_GOOGLE_GMAIL = process.env.MY_GOOGLE_GMAIL;
 
-const sender_mail = '"Juan Felipe" <zepedajuande9@gmail.com>';
+const sender_mail = `"Juan Felipe" <${MY_GOOGLE_GMAIL}>`;
 
 
 /**
