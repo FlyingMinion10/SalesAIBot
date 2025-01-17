@@ -13,9 +13,10 @@ const { sendToMeetAgent } = require('./meetAgent');
 const { sendToPriceAgent } = require('./priceAgent');
 const { sendToInfoAgent } = require('./infoAgent');
 const { l, f, flat } = require('./tools/utils');
+const { json } = require("express");
 
 // Importar texto de instrucciones
-const pathPrompt = path.join(__dirname, "../src/prompts", "/formatPrompt.txt");
+const pathPrompt = path.join(__dirname, "prompts", "/formatPrompt.txt");
 const prompt = fs.readFileSync(pathPrompt, "utf8")
 
 // Importar variables de entorno
@@ -94,7 +95,8 @@ async function handleAgentChooser(run, threadId) {
 }
 
 async function subAgentManager(selectedAgent, threadId, userMessage) {
-    
+
+    console.log('Choosed agent (98): ' + selectedAgent); // MFM 
     switch (selectedAgent) {
         case 'reuniones':
             result = await sendToMeetAgent(threadId, userMessage);
@@ -111,9 +113,8 @@ async function subAgentManager(selectedAgent, threadId, userMessage) {
         default:
             console.warn(`Función no reconocida: ${selectedAgent} \n`);
     }
-    console.log(`Tool Callback (114) ${selectedAgent}:`, result.success ? 'Success' : 'Failture' ); // MFM 
-    return result.responseContent
-    
+
+    return result.responseContent    
 }
 
 // Función principal modificada
@@ -133,6 +134,7 @@ async function sendToCeoAgent(userId, userMessage) {
             await registerThread(userId, threadId);
         }
 
+        // Añadir el mensaje al thread
         await client.beta.threads.messages.create(threadId, {
             role: "user",
             content: userMessage
@@ -144,14 +146,13 @@ async function sendToCeoAgent(userId, userMessage) {
         });
 
         // Manejar el estado del run
-        
         let runStatus;
         let subAgentResponse;
         do {
             runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 500)); // MFM
             if (runStatus.status === "requires_action") {
-                callback(runStatus.required_action, true);
+                l.red(runStatus.required_action);
                 // choosedAgent = await handleAgentChooser(runStatus, threadId);
             }
         } while (runStatus.status !== "completed");
@@ -171,9 +172,9 @@ async function sendToCeoAgent(userId, userMessage) {
     }
 }
 
-// --------------------------
-//   FUNCIONES OPERATIVAS
-// --------------------------
+// ----------------------------------------------------
+//                FUNCIONES OPERATIVAS
+// ----------------------------------------------------
 
 // Función para enviar audio a Whisper de OpenAI
 async function sendToWhisper(audioFilePath) {
@@ -223,13 +224,14 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
 async function sendToverificador(assistantResponse) {
     try {
 
+        const flatMsg = flat(assistantResponse);
         let formatedMsg = await formatear(assistantResponse);
+        // l.blue(`\nRespuesta inicial del modelo:`, flatMsg);
+        l.blue(`\nRespuesta formateada del modelo:`, formatedMsg);
         
-        l.blue(`\nRespuesta inicial del modelo:`, flat(assistantResponse));
-        
-        // console.log("Respuesta formateada:", formatedMsg);
+        return assistantResponse;
+        // return formatedMsg;
 
-        return formatedMsg;
     } catch (error) {
         console.error("Error en sendToverificador:", error.message);
         return null;

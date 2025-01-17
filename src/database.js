@@ -3,7 +3,7 @@ const { Pool } = require("pg");
 require("dotenv").config();
 
 // Variables
-const table_name = "node_threads_rest_i";
+const table_name = "node_threads_nexora";
 
 // Configurar conexión con PostgreSQL
 const pool = new Pool({

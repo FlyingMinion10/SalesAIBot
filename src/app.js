@@ -58,14 +58,15 @@ bot.on('message', async (msg) => {
       const openAIResponse = await processRequest(chatId, texto);
 
       if (openAIResponse) {
-        for (const parte in openAIResponse) {
-          if (openAIResponse.hasOwnProperty(parte)) {
-            const mensaje = openAIResponse[parte];
-            await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
-          }
-        }
+          await bot.sendMessage(chatId, openAIResponse, { parse_mode: 'Markdown' }); // MFM
+        // for (const parte in openAIResponse) {
+        //   if (openAIResponse.hasOwnProperty(parte)) {
+        //     const mensaje = openAIResponse[parte];
+        //     await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
+        //   }
+        // }
       } else {
-        bot.sendMessage(chatId, 'No se pudo obtener una respuesta válida.');
+          bot.sendMessage(chatId, 'No se pudo obtener una respuesta válida.');
       }
 
     // Si es un mensaje de voz
