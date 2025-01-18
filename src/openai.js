@@ -201,19 +201,44 @@ async function formatear(assistantResponse, systemInstructions = `${prompt}` ) {
     try {
         const response = await openai.chat.completions.create({
             model: models.verificador, // Modelo usado
+            temperature : 0.1,
             messages: [
-                {
-                    role: "system",
-                    content: systemInstructions
-                },
-                {
-                    role: "user",
-                    content: assistantResponse
-                }
+                { role: "system", content: systemInstructions },
+                { role: "user", content: assistantResponse }
             ],
-            response_format: { type: "json_object" }, // Asegura salida JSON
+            response_format: { 
+                type: "json_schema",
+                json_schema: {
+                    name: "schema_with_optional_parts",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: {
+                        part1: {
+                          type: "string",
+                          description: "This is a mandatory part of the schema."
+                        },
+                        part2: {
+                          type: "string",
+                          description: "This is an optional part of the schema."
+                        },
+                        part3: {
+                          type: "string",
+                          description: "This is also an optional part of the schema."
+                        }
+                      },
+                      required: [
+                        "part1",
+                        "part2",
+                        "part3"
+                      ],
+                      additionalProperties: false
+                    }
+                  } 
+            },
         });
         return JSON.parse(response.choices[0].message.content);
+
     } catch (error) {
         console.error("Error al parsear la respuesta del modelo:", error);
         throw new Error("No se pudo parsear la respuesta del modelo.");
@@ -226,11 +251,10 @@ async function sendToverificador(assistantResponse) {
 
         const flatMsg = flat(assistantResponse);
         let formatedMsg = await formatear(assistantResponse);
-        // l.blue(`\nRespuesta inicial del modelo:`, flatMsg);
-        l.blue(`\nRespuesta formateada del modelo:`, formatedMsg);
+        l.blue(`\nRespuesta inicial del modelo:`, flatMsg);
+        // l.blue(`\nRespuesta formateada del modelo:`, formatedMsg);
         
-        return assistantResponse;
-        // return formatedMsg;
+        return formatedMsg;
 
     } catch (error) {
         console.error("Error en sendToverificador:", error.message);

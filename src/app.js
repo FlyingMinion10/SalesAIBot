@@ -30,9 +30,10 @@ const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 async function processRequest(userId, userMessage) {
   try {
     const assistantResponse = await sendToCeoAgent(userId, userMessage);
-    
+    // const assistantResponse = 'Puedes decirme de que color es el cielo chat?'; // MFD
     const output = await sendToverificador(assistantResponse);
     return output;
+
   } catch (error) {
     console.error('Error al enviar mensaje al asistente de OpenAI:', error);
     return 'Hubo un error al procesar tu solicitud.';
@@ -56,15 +57,21 @@ bot.on('message', async (msg) => {
       
 
       const openAIResponse = await processRequest(chatId, texto);
+      // const openAIResponse = 
+      // {
+      //   part1: '¡Claro! En **Nexora** creamos **robots** que ayudan a las **empresas** a responder **preguntas** de los clientes y a gestionar **tareas**, como agendar citas. Esto les permite **ahorrar tiempo** y **mejorar su servicio**.',
+      //   part2: 'Si necesitas más información o algo específico, házmelo saber.',
+      //   part3: ''
+      // } // MFD
 
       if (openAIResponse) {
-          await bot.sendMessage(chatId, openAIResponse, { parse_mode: 'Markdown' }); // MFM
-        // for (const parte in openAIResponse) {
-        //   if (openAIResponse.hasOwnProperty(parte)) {
-        //     const mensaje = openAIResponse[parte];
-        //     await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
-        //   }
-        // }
+        for (const parte in openAIResponse) {
+          if (openAIResponse.hasOwnProperty(parte) && openAIResponse[parte] !== '') {
+            const mensaje = openAIResponse[parte];
+            await bot.sendMessage(chatId, mensaje, { parse_mode: 'Markdown' });
+          }
+        }
+
       } else {
           bot.sendMessage(chatId, 'No se pudo obtener una respuesta válida.');
       }

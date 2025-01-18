@@ -60,7 +60,7 @@ const client = openai;
 //                 default:
 //                     console.warn(`Función no reconocida: ${name} \n`);
 //             }
-//             console.log(`Tool Callback (149) ${name}: ${result.success}`); // MFM \n
+//             console.log(`Tool Callback (149) ${name}: ${result.success}`); 
 
 //             // Importante: Guardar el resultado
 //             toolOutputs.push({
