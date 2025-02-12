@@ -1,4 +1,12 @@
 // Importa las dependencias necesarias
+/*
+Adaptarlo para plataforma yantissimo
+Separar agentes y utilizar CEO
+Mensajes asyncronos
+Integrar perplexity
+Interfaz de base de datos
+
+*/
 const TelegramBot = require('node-telegram-bot-api'); // Librería para el bot de Telegram
 const axios = require('axios'); // Cliente HTTP para hacer peticiones
 const fs = require('fs');
